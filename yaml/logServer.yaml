@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: logs-server
+  labels:
+    app: logs-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: logs-server
+  template:
+    metadata:
+      labels:
+        app: logs-server
+    spec:
+      containers:
+        - name: node
+          image: node:14
+          ports:
+            - containerPort: 3000
+          command:
+            - bash
+          args:
+            - -c
+            - |
+              cat <<EOF > server.js
+              const express = require('express');
+              const aws = require('aws-sdk');
+              
+              aws.config.update({
+                accessKeyId: '$AWS_ACCESS_KEY_ID',
+                secretAccessKey: '$AWS_SECRET_ACCESS_KEY',
+                s3ForcePathStyle: true,
+                sslEnabled: false
+              });
+              
+              const s3 = new aws.S3();
+              const app = express();
+              
+              const bucket = '$S3_BUCKET'
+              
+              function streamLogs(namespace, pod, container, response) {
+                s3.listObjects({ Bucket: bucket, Delimiter: '', Prefix: namespace+'/'+pod+'/'+container+'/' })
+                  .promise()
+                  .then(files =>
+                    files.Contents.sort((a, b) => a.Key.localeCompare(b.Key)).reduce((acc, file) =>
+                      acc.then(() =>
+                        new Promise(fulfill =>
+                          s3.getObject({Bucket: bucket, Key: file.Key})
+                            .createReadStream()
+                            .on("finish", fulfill)
+                            .pipe(response, { end: false })
+                        )
+                      ),
+                      Promise.resolve()
+                    )
+                  )
+                  .then(() => response.end());
+              }
+              app.get('/logs/:namespace/:pod/:container', (req, res) => streamLogs(req.params.namespace, req.params.pod, req.params.container, res));
+              app.listen(3000, '0.0.0.0');
+              EOF
+              
+              npm install aws-sdk@2.1073.0 express@4.17.2
+              
+              node ./server.js

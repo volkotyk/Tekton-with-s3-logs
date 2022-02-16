@@ -1,0 +1,28 @@
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  generateName: sample-
+spec:
+  pipelineSpec:
+    tasks:
+      - name: gen-log
+        taskSpec:
+          steps:
+            - name: gen-log
+              image: ubuntu
+              script: |
+                #!/usr/bin/env bash
+                for i in {1..10}
+                do
+                  echo "Log line \$i"
+                  sleep 1s
+                done
+            - name: gen-log-2
+              image: ubuntu
+              script: |
+                #!/usr/bin/env bash
+                for i in {1..100}
+                do
+                  echo "Log line \$i"
+                  sleep 1s
+                done

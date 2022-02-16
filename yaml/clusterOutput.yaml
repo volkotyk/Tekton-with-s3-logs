@@ -1,0 +1,29 @@
+apiVersion: logging.banzaicloud.io/v1beta1
+kind: ClusterOutput
+metadata:
+  name: s3
+spec:
+  s3:
+    aws_key_id:
+      valueFrom:
+        secretKeyRef:
+          name: logging-s3
+          key: awsAccessKeyId
+    aws_sec_key:
+      valueFrom:
+        secretKeyRef:
+          name: logging-s3
+          key: awsSecretAccessKey
+    s3_bucket: $S3_BUCKET
+    store_as: text
+    path: \${\$.kubernetes.namespace_name}/\${\$.kubernetes.pod_name}/\${\$.kubernetes.container_name}/
+    s3_object_key_format: '%{path}%{time_slice}_%{index}.log'
+    buffer:
+      tags: time,\$.kubernetes.namespace_name,\$.kubernetes.pod_name,\$.kubernetes.container_name
+      timekey: 1m
+      timekey_wait: 30s
+      timekey_use_utc: true
+    format:
+      type: single_value
+      add_newline: false
+      message_key: log
